@@ -38,10 +38,11 @@ laptops' JSON files together and save the combined HTML. Use the same time windo
 - `style.css`: page appearance.
 - `settings.js`: round duration, speeds, colours and dimensions.
 - `game.js`: scene, input, collisions, score and end-of-round behaviour.
+- `sounds.js`: retro sound effects synthesised with the Web Audio API (coin, hit, game over) and the M mute toggle.
 - `vendor/phaser-3.90.0.min.js`: the pinned Phaser runtime, byte for byte the file published at
   `https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js`; `vendor/LICENSE.phaser.txt` is its MIT licence.
 
-The game draws its own shapes; there are no image or audio assets. The authored files are under the
+The game draws its own shapes; there are no image or audio assets (sounds are generated at runtime). The authored files are under the
 MIT licence in LICENSE.txt. Phaser documentation:
 https://docs.phaser.io/phaser/getting-started/making-your-first-phaser-game
 
