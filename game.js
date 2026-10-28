@@ -8,6 +8,7 @@ class CoinDash extends Phaser.Scene {
     this.coins = 0;   // coins collected; drives level progression
     this.level = 1;
     this.finished = false;
+    this.banner = null;
     this.deadline = this.time.now + c.roundSeconds * 1000;
     this.physics.world.setBounds(0, 44, c.width, c.height - 44);
     this.add.grid(c.width / 2, c.height / 2, c.width, c.height, 40, 40,
@@ -24,15 +25,14 @@ class CoinDash extends Phaser.Scene {
     this.coin.body.setCircle(9);
     this.placeCoin();
     this.drones = this.physics.add.group();
+    // Level 1: the original three drones, placed and aimed as before.
     for (let i = 0; i < c.droneCount; i++) {
-      const drone = this.add.rectangle(90 + i * 270, 100, 26, 26, c.colors.drone);
-      this.drones.add(drone);
-      drone.body.setCollideWorldBounds(true).setBounce(1, 1);
-      const angle = (35 + i * 105) * Math.PI / 180;
-      drone.body.setVelocity(Math.cos(angle) * c.droneSpeed, Math.sin(angle) * c.droneSpeed);
+      COIN_DASH_LEVELS.createEnemy(this, 'drone', 90 + i * 270, 100, 35 + i * 105);
     }
     this.physics.add.overlap(this.player, this.coin, () => this.collectCoin());
-    this.physics.add.overlap(this.player, this.drones, () => this.finish('A drone caught you!'));
+    this.physics.add.overlap(this.player, this.drones, (player, drone) => {
+      if (COIN_DASH_LEVELS.isHarmful(drone, this.time.now)) this.finish('A drone caught you!');
+    });
     this.cursors = this.input.keyboard.createCursorKeys();
     this.keys = this.input.keyboard.addKeys('W,A,S,D,R');
     this.input.keyboard.on('keydown-R', () => this.scene.restart());
@@ -52,17 +52,25 @@ class CoinDash extends Phaser.Scene {
 
   levelUp(level) {
     this.level = level;
-    this.showBanner(`LEVEL ${level}`, '');
+    const wanted = COIN_DASH_LEVELS.enemyKindsForLevel(level);
+    const added = wanted.slice(this.drones.getLength());
+    added.forEach(kind => COIN_DASH_LEVELS.spawnEnemy(this, kind));
+    const { kinds, speedFactorForLevel } = COIN_DASH_LEVELS;
+    const faster = speedFactorForLevel(level) > speedFactorForLevel(level - 1);
+    this.showBanner(`LEVEL ${level}`, added.length
+      ? added.map(k => `New enemy: ${kinds[k].name} - ${kinds[k].hint}`).join('\n')
+      : (faster ? 'Enemies are faster' : 'Keep going!'));
   }
 
   showBanner(title, subtitle) {
     const c = COIN_DASH;
-    const banner = this.add.text(c.width / 2, c.height / 2 - 60, `${title}\n${subtitle}`, {
-      font: 'bold 30px monospace', color: '#71e8ce', align: 'center',
+    if (this.banner) this.banner.destroy();
+    const banner = this.banner = this.add.text(c.width / 2, c.height / 2 - 60, `${title}\n${subtitle}`, {
+      font: 'bold 26px monospace', color: '#71e8ce', align: 'center',
       stroke: '#0a1120', strokeThickness: 6
     }).setOrigin(0.5);
     this.tweens.add({ targets: banner, alpha: 0, delay: 900, duration: 600,
-      onComplete: () => banner.destroy() });
+      onComplete: () => { banner.destroy(); if (this.banner === banner) this.banner = null; } });
   }
 
   placeCoin() {
@@ -85,6 +93,7 @@ class CoinDash extends Phaser.Scene {
       - Number(this.cursors.up.isDown || this.keys.W.isDown);
     const direction = new Phaser.Math.Vector2(dx, dy).normalize().scale(COIN_DASH.playerSpeed);
     this.player.body.setVelocity(direction.x, direction.y);
+    COIN_DASH_LEVELS.updateEnemies(this, { level: this.level, slow: false, shrink: false });
     const seconds = Math.max(0, Math.ceil((this.deadline - this.time.now) / 1000));
     this.hud.setText(`Score: ${this.score}`);
     this.levelText.setText(`Level ${this.level}`);
