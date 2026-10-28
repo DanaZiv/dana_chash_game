@@ -4,7 +4,7 @@
 // follow them every frame. All art is generated from the pixel grids in this file.
 // Depths stay below 10 so overlays drawn by other features (e.g. pause) appear on top.
 (function () {
-  const DEPTH = { background: 0, clouds: 1, glow: 2, coin: 3, enemy: 4, player: 5, fx: 6, hud: 7, gameOver: 9 };
+  const DEPTH = { background: 0, clouds: 1, glow: 2, coin: 3, player: 5, fx: 6, hud: 7, enemy: 8, gameOver: 9 };
   const FONT = '"Courier New", Courier, monospace';
   const OUTLINE = 0x1b1010;
 
@@ -35,28 +35,33 @@
     ['...BBB....BBB...', '..NNNN....NNNN..']
   ];
 
+  // Mushroom enemy: 20x20 cells at 2px, so it reads clearly at game size. The physics body
+  // from game.js is unchanged (26x26) and sits over the head and face.
   const SHROOM_PALETTE = {
-    M: 0x9a4a1c, m: 0x6a2f10, K: 0x150a05, W: 0xffffff, T: 0xf3d2a2, t: 0xc99a62
+    M: 0x9a4a1c, m: 0x6a2f10, L: 0xc8743c, K: 0x150a05, W: 0xffffff, T: 0xf3d2a2, t: 0xc99a62
   };
   const SHROOM_BODY = [
-    '......mmmm......',
-    '....mMMMMMMm....',
-    '...MMMMMMMMMM...',
-    '..MMMMMMMMMMMM..',
-    '.MMKKMMMMMMKKMM.',
-    '.MMMKKKMMKKKMMM.',
-    'MMMMWWKMMKWWMMMM',
-    'MMMMWKKMMKKWMMMM',
-    'MMMMWKKMMKKWMMMM',
-    'MMMMMMMMMMMMMMMM',
-    'MMMKKKKKKKKKKMMM',
-    '.MMKWMMMMMMWKMM.',
-    '..mmmTTTTTTmmm..',
-    '....TTttttTT....'
+    '.......mmmmmm.......',
+    '.....mMMMMMMMMm.....',
+    '....MLLMMMMMMMMM....',
+    '...MLLMMMMMMMMMMM...',
+    '..MKKMMMMMMMMMMKKM..',
+    '..MMKKKKMMMMKKKKMM..',
+    '.MMMMWWWKMMKWWWMMMM.',
+    '.MMMWWWKKMMKKWWWMMM.',
+    'MMMMWWWKKMMKKWWWMMMM',
+    'MMMMMWWWMMMMWWWMMMMM',
+    'MMMMMMMMMMMMMMMMMMMM',
+    'MMMMMKKKKKKKKKKMMMMM',
+    '.MMMMKWKKKKKKWKMMMM.',
+    '..mmmmmmmmmmmmmmmm..',
+    '.....TTTTTTTTTT.....',
+    '....TTTTTTTTTTTT....',
+    '....TTTTttttTTTT....'
   ];
   const SHROOM_FEET = [
-    ['..KKKTTTTTTKK...', '.KKKKKK...KKKK..'],
-    ['...KKTTTTTTKKK..', '..KKKK...KKKKKK.']
+    ['..KKKKKTTTTTTKK.....', '.KKKKKKKK..KKKKK....', '.KKKKKKKK..KKKKK....'],
+    ['.....KKTTTTTTKKKKK..', '....KKKKK..KKKKKKKK.', '....KKKKK..KKKKKKKK.']
   ];
 
   const SPARKLE = ['...W...', '...W...', '..WYW..', 'WWYYYWW', '..WYW..', '...W...', '...W...'];
@@ -104,7 +109,7 @@
     HERO_FEET.forEach((feet, i) =>
       pixelTexture(scene, `hero${i}`, HERO_BODY.concat(feet), HERO_PALETTE, 2));
     SHROOM_FEET.forEach((feet, i) =>
-      pixelTexture(scene, `shroom${i}`, SHROOM_BODY.concat(feet), SHROOM_PALETTE, 2));
+      pixelTexture(scene, `goomba${i}`, SHROOM_BODY.concat(feet), SHROOM_PALETTE, 2));
     const coinPalette = { y: 0xffd23f, o: 0xd98a00, h: 0xfff6c0 };
     [5, 3.6, 2.1, 0.8].forEach((hw, i) => pixelTexture(scene, `coin${i}`, coinRows(hw), coinPalette, 2));
     pixelTexture(scene, 'sparkle', SPARKLE, { W: 0xffffff, Y: 0xffe066 }, 2);
@@ -134,7 +139,7 @@
   function createAnimations(scene) {
     const anims = [
       ['hero-walk', ['hero0', 'hero1'], 8],
-      ['shroom-walk', ['shroom0', 'shroom1'], 5],
+      ['goomba-walk', ['goomba0', 'goomba1'], 6],
       ['coin-spin', ['coin0', 'coin1', 'coin2', 'coin3', 'coin2', 'coin1'], 10]
     ];
     anims.forEach(([key, frames, frameRate]) => {
@@ -292,9 +297,11 @@
       this.coinSprite = scene.add.sprite(coin.x, coin.y, 'coin0').setDepth(DEPTH.coin).play('coin-spin');
       this.enemies = drones.getChildren().map((drone, i) => {
         drone.setVisible(false);
-        const sprite = scene.add.sprite(drone.x, drone.y, 'shroom0').setDepth(DEPTH.enemy).play('shroom-walk');
+        // Enemies draw above the HUD bar so their edges are never hidden when they bounce off the top.
+        const shadow = scene.add.ellipse(drone.x, drone.y, 34, 8, 0x000000, 0.28).setDepth(DEPTH.enemy);
+        const sprite = scene.add.sprite(drone.x, drone.y, 'goomba0').setDepth(DEPTH.enemy).play('goomba-walk');
         sprite.anims.setProgress(i / 3);
-        return { drone, sprite };
+        return { drone, sprite, shadow, phase: i * 2.1 };
       });
       this.follow(0);
     }
@@ -320,8 +327,12 @@
       this.heroShadow.setPosition(this.player.x, this.player.y + 15);
       this.coinSprite.setPosition(this.coin.x, this.coin.y);
       this.coinGlow.setPosition(this.coin.x, this.coin.y);
-      this.enemies.forEach(({ drone, sprite }) => {
-        sprite.setPosition(drone.x, drone.y - 2);
+      this.enemies.forEach(({ drone, sprite, shadow, phase }) => {
+        // A small waddle (tilt and squash) on the sprite only; the physics body is untouched.
+        const t = paused ? 0 : this.scene.time.now / 160 + phase;
+        sprite.setPosition(drone.x, drone.y - 4 - Math.abs(Math.sin(t)) * 2);
+        sprite.setAngle(Math.sin(t) * 5).setScale(1, 1 - Math.abs(Math.cos(t)) * 0.04);
+        shadow.setPosition(drone.x, drone.y + 17);
         if (drone.body.velocity.x !== 0) sprite.setFlipX(drone.body.velocity.x > 0);
         if (paused && sprite.anims.isPlaying) sprite.anims.pause();
         if (!paused && sprite.anims.isPaused) sprite.anims.resume();
