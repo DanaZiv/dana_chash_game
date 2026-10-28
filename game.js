@@ -1,11 +1,15 @@
 /* global Phaser, COIN_DASH, COIN_DASH_LEVELS, COIN_DASH_POWERUPS, CoinDashTutorial */
+// Several coins are always on the field; a collected coin reappears elsewhere at once.
+const COIN_RULES = { count: 6, doubleChance: 0.25, doubleColor: 0xff922b, minGap: 45 };
+
 class CoinDash extends Phaser.Scene {
   constructor() { super('CoinDash'); }
 
   create() {
     const c = COIN_DASH;
     this.score = 0;   // points; read it with getScore() or listen for 'score-changed'
-    this.coins = 0;   // coins collected; drives level progression
+    this.coins = 0;        // total coins collected this round
+    this.levelCoins = 0;   // coins collected in the current level
     this.level = 1;
     this.finished = false;
     this.banner = null;
@@ -15,23 +19,28 @@ class CoinDash extends Phaser.Scene {
       c.colors.background, 1, 0x24334b, 0.45);
     const hudFont = { font: '18px monospace', color: '#ffffff' };
     this.hud = this.add.text(18, 12, '', hudFont);
-    this.levelText = this.add.text(230, 12, '', { ...hudFont, color: '#71e8ce', fontStyle: 'bold' });
+    this.levelText = this.add.text(170, 12, '', { ...hudFont, color: '#71e8ce', fontStyle: 'bold' });
     this.timeText = this.add.text(c.width - 18, 12, '', hudFont).setOrigin(1, 0);
     this.player = this.add.rectangle(c.width / 2, c.height / 2, 24, 24, c.colors.player);
     this.physics.add.existing(this.player);
     this.player.body.setCollideWorldBounds(true);
-    this.coin = this.add.circle(100, 100, 9, c.colors.coin);
-    this.physics.add.existing(this.coin);
-    this.coin.body.setCircle(9);
-    this.placeCoin();
+    this.coinGroup = this.physics.add.group();
+    for (let i = 0; i < COIN_RULES.count; i++) {
+      const coin = this.add.circle(0, 0, 9, c.colors.coin);
+      this.coinGroup.add(coin);
+      coin.body.setCircle(9);
+      coin.label = this.add.text(0, 0, '2', { font: 'bold 13px monospace', color: '#4a2500' })
+        .setOrigin(0.5);
+      this.placeCoin(coin);
+    }
     this.drones = this.physics.add.group();
     // Level 1: the original three drones, placed and aimed as before.
     for (let i = 0; i < c.droneCount; i++) {
       COIN_DASH_LEVELS.createEnemy(this, 'drone', 90 + i * 270, 100, 35 + i * 105);
     }
     // Fresh manager per round, so restarting clears every active effect.
-    this.powerUps = new COIN_DASH_POWERUPS.Manager(this, 352, 22);
-    this.physics.add.overlap(this.player, this.coin, () => this.collectCoin());
+    this.powerUps = new COIN_DASH_POWERUPS.Manager(this, 372, 22, 80);
+    this.physics.add.overlap(this.player, this.coinGroup, (player, coin) => this.collectCoin(coin));
     this.physics.add.overlap(this.player, this.drones, (player, drone) => {
       if (COIN_DASH_LEVELS.isHarmful(drone, this.time.now)) this.finish('A drone caught you!');
     });
@@ -42,16 +51,22 @@ class CoinDash extends Phaser.Scene {
 
   getScore() { return this.score; }
 
-  pointsPerCoin() { return this.powerUps.isActive('double') ? 2 : 1; }
+  // A double coin is worth 2; the Double points power-up doubles whatever the coin is worth.
+  pointsForCoin(coin) {
+    return (coin.isDouble ? 2 : 1) * (this.powerUps.isActive('double') ? 2 : 1);
+  }
 
-  collectCoin() {
+  collectCoin(coin) {
     if (this.finished) return;
     this.coins++;
-    this.score += this.pointsPerCoin();
+    this.levelCoins++;
+    this.score += this.pointsForCoin(coin);
     this.events.emit('score-changed', this.score);
-    this.placeCoin();
-    const level = COIN_DASH_LEVELS.levelForCoins(this.coins);
-    if (level > this.level) this.levelUp(level);
+    this.placeCoin(coin);
+    if (this.levelCoins >= COIN_DASH_LEVELS.coinsForLevel(this.level)) {
+      this.levelCoins = 0;
+      this.levelUp(this.level + 1);
+    }
   }
 
   levelUp(level) {
@@ -77,16 +92,24 @@ class CoinDash extends Phaser.Scene {
       onComplete: () => { banner.destroy(); if (this.banner === banner) this.banner = null; } });
   }
 
-  placeCoin() {
+  placeCoin(coin) {
     const c = COIN_DASH;
-    // Avoid spawning the next coin directly underneath the player.
-    let x, y;
+    // Avoid spawning the coin underneath the player or on top of another coin.
+    const others = this.coinGroup.getChildren().filter(other => other !== coin && other.placed);
+    let x, y, tries = 0;
     do {
       x = Phaser.Math.Between(25, c.width - 25);
       y = Phaser.Math.Between(70, c.height - 25);
-    } while (Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y) < 60);
-    this.coin.setPosition(x, y);
-    this.coin.body.reset(x, y);
+    } while (++tries < 50 &&
+      (Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y) < 60 ||
+       others.some(o => Phaser.Math.Distance.Between(x, y, o.x, o.y) < COIN_RULES.minGap)));
+    coin.isDouble = Math.random() < COIN_RULES.doubleChance;
+    coin.placed = true;
+    coin.setFillStyle(coin.isDouble ? COIN_RULES.doubleColor : c.colors.coin);
+    coin.setScale(coin.isDouble ? 1.4 : 1);
+    coin.setPosition(x, y);
+    coin.body.reset(x, y);
+    coin.label.setPosition(x, y).setVisible(coin.isDouble);
   }
 
   update() {
@@ -105,7 +128,8 @@ class CoinDash extends Phaser.Scene {
     });
     const seconds = Math.max(0, Math.ceil((this.deadline - this.time.now) / 1000));
     this.hud.setText(`Score: ${this.score}`);
-    this.levelText.setText(`Level ${this.level}`);
+    this.levelText.setText(
+      `Level ${this.level} · ${this.levelCoins}/${COIN_DASH_LEVELS.coinsForLevel(this.level)}`);
     this.timeText.setText(`Time: ${seconds}s`);
     if (seconds === 0) this.finish('Time is up!');
   }

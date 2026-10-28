@@ -73,15 +73,15 @@ window.COIN_DASH_POWERUPS = (() => {
   }
 
   class Manager {
-    constructor(scene, hudX, hudY) {
+    constructor(scene, hudX, hudY, hudGap = 86) {
       this.scene = scene;
       this.expiresAt = {};   // type -> scene time when the effect ends
       this.pickup = null;
       this.lastType = null;
       this.nextSpawnAt = scene.time.now + Phaser.Math.Between(...rules.firstSpawnMs);
       this.hud = order.map((type, i) => {
-        const icon = makeIcon(scene, type, hudX + i * 86, hudY, 0.65);
-        const text = scene.add.text(hudX + i * 86 + 13, hudY, '', {
+        const icon = makeIcon(scene, type, hudX + i * hudGap, hudY, 0.65);
+        const text = scene.add.text(hudX + i * hudGap + 13, hudY, '', {
           font: '16px monospace', color: '#ffffff'
         }).setOrigin(0, 0.5);
         return { type, icon, text };

@@ -16,20 +16,25 @@ class CoinDashTutorial extends Phaser.Scene {
       .setOrigin(0.5);
 
     const left = 70;
-    this.add.text(left, 82, 'Move with the ARROW KEYS or WASD.', body);
+    this.add.text(left, 74, 'Move with the ARROW KEYS or WASD.', body);
 
-    this.add.circle(left + 9, 128, 9, c.colors.coin);
-    this.add.text(left + 30, 118,
-      `Collect coins for points. Every ${COIN_DASH_LEVELS.rules.coinsPerLevel} coins = next level.`, body);
+    const step = COIN_DASH_LEVELS.rules.coinsPerLevel;
+    this.add.circle(left + 9, 112, 9, c.colors.coin);
+    this.add.text(left + 30, 102, 'Coin = 1 point.', body);
+    this.add.circle(left + 222, 112, 12, 0xff922b);
+    this.add.text(left + 222, 112, '2', { font: 'bold 13px monospace', color: '#4a2500' }).setOrigin(0.5);
+    this.add.text(left + 245, 102, 'Big orange coin = 2 points.', body);
+    this.add.text(left, 132,
+      `Level N needs N x ${step} coins (${step}, ${step * 2}, ${step * 3}, ...) to go up.`, body);
 
     const kinds = COIN_DASH_LEVELS.kinds;
     Object.keys(kinds).forEach((kind, i) => {
-      this.add.rectangle(left + 9 + i * 26, 166, 18, 18, kinds[kind].color);
+      this.add.rectangle(left + 9 + i * 26, 174, 18, 18, kinds[kind].color);
     });
-    this.add.text(left + 110, 156, 'Avoid enemies - one touch ends the round.', body);
-    this.add.text(left + 110, 178, 'New kinds appear as levels go up.', { ...body, color: '#9fb0c8' });
+    this.add.text(left + 110, 164, 'Avoid enemies - one touch ends the round.', body);
+    this.add.text(left + 110, 186, 'New kinds appear as levels go up.', { ...body, color: '#9fb0c8' });
 
-    this.add.text(left, 216, 'Collect power-ups. Each one lasts 5 SECONDS:', body);
+    this.add.text(left, 222, 'Collect power-ups. Each one lasts 5 SECONDS:', body);
     const P = COIN_DASH_POWERUPS;
     P.order.forEach((type, i) => {
       const x = 145 + i * 170;

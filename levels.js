@@ -1,9 +1,9 @@
 /* global Phaser, COIN_DASH */
 // Level progression and enemy behaviours. Level 1 is the original game (three bouncing
-// drones at the original speed); one level is added every `coinsPerLevel` coins.
+// drones at the original speed); level N ends after N x `coinsPerLevel` coins.
 window.COIN_DASH_LEVELS = (() => {
   const rules = {
-    coinsPerLevel: 5,
+    coinsPerLevel: 5,         // level 1 needs 5 coins, level 2 needs 10, level 3 needs 15 ...
     maxEnemies: 8,            // upper limit, reached at level 6
     speedStepPerLevel: 0.05,  // +5% enemy speed per level above 1 ...
     maxSpeedFactor: 1.3,      // ... capped at +30%
@@ -26,8 +26,8 @@ window.COIN_DASH_LEVELS = (() => {
   // Enemies added on top of the original drones, one per level from level 2.
   const extraKinds = ['fast', 'chaser', 'zigzag', 'fast', 'chaser'];
 
-  function levelForCoins(coins) {
-    return 1 + Math.floor(coins / rules.coinsPerLevel);
+  function coinsForLevel(level) {
+    return level * rules.coinsPerLevel;
   }
 
   function enemyKindsForLevel(level) {
@@ -112,7 +112,7 @@ window.COIN_DASH_LEVELS = (() => {
   }
 
   return {
-    rules, kinds, levelForCoins, enemyKindsForLevel, speedFactorForLevel,
+    rules, kinds, coinsForLevel, enemyKindsForLevel, speedFactorForLevel,
     createEnemy, spawnEnemy, isHarmful, updateEnemies
   };
 })();
