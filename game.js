@@ -42,20 +42,55 @@ class CoinDash extends Phaser.Scene {
       this.add.text(0, -12, 'PAUSED', { font: '36px monospace', color: '#ffd166' }).setOrigin(0.5),
       this.add.text(0, 28, 'Press P to resume', { font: '16px monospace', color: '#ffffff' }).setOrigin(0.5)
     ]).setDepth(10).setVisible(false);
+    this.countingDown = false;
+    this.countdownText = this.add.text(c.width / 2, c.height / 2, '',
+      { font: 'bold 96px monospace', color: '#ffd166', stroke: '#0a1120', strokeThickness: 8 }
+    ).setOrigin(0.5).setDepth(10).setVisible(false);
   }
 
   togglePause() {
-    if (this.finished) return;
-    this.paused = !this.paused;
+    // Ignore P after the round ends or while a resume countdown is running.
+    if (this.finished || this.countingDown) return;
     if (this.paused) {
-      // Freeze the countdown by remembering how much time was left.
-      this.remainingMs = this.deadline - this.time.now;
-      this.physics.pause();
-    } else {
-      this.deadline = this.time.now + this.remainingMs;
-      this.physics.resume();
+      this.startResumeCountdown();
+      return;
     }
-    this.pauseOverlay.setVisible(this.paused);
+    this.paused = true;
+    // Freeze the round timer by remembering how much time was left.
+    this.remainingMs = this.deadline - this.time.now;
+    this.physics.pause();
+    this.pauseOverlay.setVisible(true);
+  }
+
+  startResumeCountdown() {
+    // The scene clock keeps ticking while physics is paused, so it drives the countdown.
+    this.countingDown = true;
+    this.pauseOverlay.setVisible(false);
+    let count = 3;
+    this.countdownText.setText(String(count)).setVisible(true);
+    this.countdownTimer = this.time.addEvent({
+      delay: 1000,
+      repeat: 2,
+      callback: () => {
+        count--;
+        if (count > 0) {
+          this.countdownText.setText(String(count));
+          return;
+        }
+        this.countdownText.setText('GO!');
+        this.resumeGame();
+        this.time.delayedCall(600, () => {
+          if (this.countdownText.text === 'GO!') this.countdownText.setVisible(false);
+        });
+      }
+    });
+  }
+
+  resumeGame() {
+    this.countingDown = false;
+    this.paused = false;
+    this.deadline = this.time.now + this.remainingMs;
+    this.physics.resume();
   }
 
   placeCoin() {
