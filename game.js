@@ -1,4 +1,4 @@
-/* global Phaser, COIN_DASH, CoinDashTheme */
+/* global Phaser, COIN_DASH, CoinDashTheme, CoinDashSounds */
 class CoinDash extends Phaser.Scene {
   constructor() { super('CoinDash'); }
 
@@ -36,9 +36,12 @@ class CoinDash extends Phaser.Scene {
       if (this.finished) return;
       this.score++;
       this.theme.collectSparkle(this.coin.x, this.coin.y);
+      CoinDashSounds.coin();
       this.placeCoin();
     });
     this.physics.add.overlap(this.player, this.drones, () => this.loseLife());
+    // The themed HUD bar uses the top-right corner for TIME, so the sound label sits just below it.
+    CoinDashSounds.attach(this, { x: c.width - 12, y: 50, size: 14 });
     this.cursors = this.input.keyboard.createCursorKeys();
     this.keys = this.input.keyboard.addKeys('W,A,S,D,R,P');
     this.input.keyboard.on('keydown-R', () => this.scene.restart());
@@ -128,6 +131,7 @@ class CoinDash extends Phaser.Scene {
     if (this.finished || this.isInvincible()) return;
     this.lives = Math.max(0, this.lives - 1);
     this.updateHearts();
+    CoinDashSounds.hit();
     if (this.lives === 0) {
       this.player.setAlpha(1);
       this.finish('A mushroom caught you!');
@@ -155,6 +159,7 @@ class CoinDash extends Phaser.Scene {
     if (this.finished) return;
     this.finished = true;
     this.physics.pause();
+    CoinDashSounds.gameOver();
     this.theme.showGameOver(reason, this.score);
   }
 }
