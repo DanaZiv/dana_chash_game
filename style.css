@@ -1,7 +1,21 @@
 * { box-sizing: border-box; }
-body { margin: 0; background: #0a1120; color: #e5edf7; font: 17px/1.5 system-ui, sans-serif; }
+body {
+  margin: 0; color: #1b1010; font: 17px/1.5 system-ui, sans-serif;
+  background: linear-gradient(#5c94fc 0, #9fc8fe 70%, #6cc04a 70%, #6cc04a 100%) fixed;
+  min-height: 100vh;
+}
 main { max-width: 850px; margin: 30px auto; padding: 0 20px; }
-header > p:first-child { color: #71e8ce; font-size: 12px; letter-spacing: .15em; }
-h1 { margin: 0; font-size: 40px; }
-#game { border: 1px solid #34445e; border-radius: 12px; overflow: hidden; }
+header > p:first-child {
+  display: inline-block; margin: 0 0 6px; padding: 2px 8px; background: #e52521; color: #fff;
+  font: bold 12px "Courier New", monospace; letter-spacing: .15em; border: 2px solid #1b1010;
+}
+h1 {
+  margin: 0; font: bold 44px "Courier New", monospace; color: #ffd23f; letter-spacing: .05em;
+  -webkit-text-stroke: 2px #1b1010; text-shadow: 4px 4px 0 #e52521;
+}
+header > p:last-child, main > p { font-weight: 600; text-shadow: 0 1px 0 rgba(255, 255, 255, .5); }
+#game {
+  border: 1px solid #1b1010; border-radius: 6px; overflow: hidden; margin: 8px 0;
+  box-shadow: 0 0 0 3px #1b1010, 0 0 0 7px #c84c0c, 0 0 0 10px #1b1010, 0 12px 24px rgba(0, 0, 0, .35);
+}
 canvas { display: block; }

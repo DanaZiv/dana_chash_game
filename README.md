@@ -38,6 +38,7 @@ laptops' JSON files together and save the combined HTML. Use the same time windo
 - `style.css`: page appearance.
 - `settings.js`: round duration, speeds, colours and dimensions.
 - `game.js`: scene, input, collisions, score and end-of-round behaviour.
+- `theme.js`: retro platformer visuals (pixel-art hero, coins, mushrooms, scenery, HUD and game-over panel), drawn on top of the unchanged physics shapes.
 - `vendor/phaser-3.90.0.min.js`: the pinned Phaser runtime, byte for byte the file published at
   `https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js`; `vendor/LICENSE.phaser.txt` is its MIT licence.
 
