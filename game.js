@@ -1,4 +1,4 @@
-/* global Phaser, COIN_DASH, COIN_DASH_LEVELS, CoinDashTutorial */
+/* global Phaser, COIN_DASH, COIN_DASH_LEVELS, COIN_DASH_POWERUPS, CoinDashTutorial */
 class CoinDash extends Phaser.Scene {
   constructor() { super('CoinDash'); }
 
@@ -29,6 +29,8 @@ class CoinDash extends Phaser.Scene {
     for (let i = 0; i < c.droneCount; i++) {
       COIN_DASH_LEVELS.createEnemy(this, 'drone', 90 + i * 270, 100, 35 + i * 105);
     }
+    // Fresh manager per round, so restarting clears every active effect.
+    this.powerUps = new COIN_DASH_POWERUPS.Manager(this, 352, 22);
     this.physics.add.overlap(this.player, this.coin, () => this.collectCoin());
     this.physics.add.overlap(this.player, this.drones, (player, drone) => {
       if (COIN_DASH_LEVELS.isHarmful(drone, this.time.now)) this.finish('A drone caught you!');
@@ -40,10 +42,12 @@ class CoinDash extends Phaser.Scene {
 
   getScore() { return this.score; }
 
+  pointsPerCoin() { return this.powerUps.isActive('double') ? 2 : 1; }
+
   collectCoin() {
     if (this.finished) return;
     this.coins++;
-    this.score++;
+    this.score += this.pointsPerCoin();
     this.events.emit('score-changed', this.score);
     this.placeCoin();
     const level = COIN_DASH_LEVELS.levelForCoins(this.coins);
@@ -91,9 +95,14 @@ class CoinDash extends Phaser.Scene {
       - Number(this.cursors.left.isDown || this.keys.A.isDown);
     const dy = Number(this.cursors.down.isDown || this.keys.S.isDown)
       - Number(this.cursors.up.isDown || this.keys.W.isDown);
-    const direction = new Phaser.Math.Vector2(dx, dy).normalize().scale(COIN_DASH.playerSpeed);
+    const powerUps = this.powerUps;
+    powerUps.update(this.player);
+    const speed = COIN_DASH.playerSpeed * (powerUps.isActive('speed') ? 2 : 1);
+    const direction = new Phaser.Math.Vector2(dx, dy).normalize().scale(speed);
     this.player.body.setVelocity(direction.x, direction.y);
-    COIN_DASH_LEVELS.updateEnemies(this, { level: this.level, slow: false, shrink: false });
+    COIN_DASH_LEVELS.updateEnemies(this, {
+      level: this.level, slow: powerUps.isActive('slow'), shrink: powerUps.isActive('shrink')
+    });
     const seconds = Math.max(0, Math.ceil((this.deadline - this.time.now) / 1000));
     this.hud.setText(`Score: ${this.score}`);
     this.levelText.setText(`Level ${this.level}`);
