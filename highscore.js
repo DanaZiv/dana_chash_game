@@ -34,8 +34,9 @@ window.CoinDashHighScore = (() => {
   }
 
   // Adds a "Best" readout to the scene's HUD and keeps it in sync with scene.score.
-  function attach(scene) {
-    const text = scene.add.text(scene.scale.width - 18, 12, '', { font: '18px monospace', color: '#ffffff' })
+  // Defaults to the top-right corner; pass { x, y, font } when that spot is already taken.
+  function attach(scene, { x = scene.scale.width - 18, y = 12, font = '18px monospace' } = {}) {
+    const text = scene.add.text(x, y, '', { font, color: '#ffffff' })
       .setOrigin(1, 0)
       .setDepth(10);
     let beaten = false;

@@ -20,7 +20,8 @@ class CoinDash extends Phaser.Scene {
     const hudFont = { font: '18px monospace', color: '#ffffff' };
     this.hud = this.add.text(18, 12, '', hudFont);
     this.levelText = this.add.text(170, 12, '', { ...hudFont, color: '#71e8ce', fontStyle: 'bold' });
-    this.timeText = this.add.text(c.width - 18, 12, '', hudFont).setOrigin(1, 0);
+    // Time and Best share the top-right corner, stacked: Time on top, Best below (see attach()).
+    this.timeText = this.add.text(c.width - 18, 4, '', hudFont).setOrigin(1, 0);
     this.player = this.add.rectangle(c.width / 2, c.height / 2, 24, 24, c.colors.player);
     this.physics.add.existing(this.player);
     this.player.body.setCollideWorldBounds(true);
@@ -47,7 +48,7 @@ class CoinDash extends Phaser.Scene {
     this.cursors = this.input.keyboard.createCursorKeys();
     this.keys = this.input.keyboard.addKeys('W,A,S,D,R');
     this.input.keyboard.on('keydown-R', () => this.scene.restart());
-    window.CoinDashHighScore.attach(this);
+    window.CoinDashHighScore.attach(this, { y: 25, font: '14px monospace' });
   }
 
   getScore() { return this.score; }
