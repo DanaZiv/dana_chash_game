@@ -1,4 +1,4 @@
-/* global Phaser, COIN_DASH */
+/* global Phaser, COIN_DASH, CoinDashTheme */
 class CoinDash extends Phaser.Scene {
   constructor() { super('CoinDash'); }
 
@@ -8,9 +8,7 @@ class CoinDash extends Phaser.Scene {
     this.finished = false;
     this.deadline = this.time.now + c.roundSeconds * 1000;
     this.physics.world.setBounds(0, 44, c.width, c.height - 44);
-    this.add.grid(c.width / 2, c.height / 2, c.width, c.height, 40, 40,
-      c.colors.background, 1, 0x24334b, 0.45);
-    this.hud = this.add.text(18, 12, '', { font: '18px monospace', color: '#ffffff' });
+    this.theme = new CoinDashTheme(this);
     this.player = this.add.rectangle(c.width / 2, c.height / 2, 24, 24, c.colors.player);
     this.physics.add.existing(this.player);
     this.player.body.setCollideWorldBounds(true);
@@ -26,12 +24,14 @@ class CoinDash extends Phaser.Scene {
       const angle = (35 + i * 105) * Math.PI / 180;
       drone.body.setVelocity(Math.cos(angle) * c.droneSpeed, Math.sin(angle) * c.droneSpeed);
     }
+    this.theme.dressUp(this.player, this.coin, this.drones);
     this.physics.add.overlap(this.player, this.coin, () => {
       if (this.finished) return;
       this.score++;
+      this.theme.collectSparkle(this.coin.x, this.coin.y);
       this.placeCoin();
     });
-    this.physics.add.overlap(this.player, this.drones, () => this.finish('A drone caught you!'));
+    this.physics.add.overlap(this.player, this.drones, () => this.finish('A mushroom caught you!'));
     this.cursors = this.input.keyboard.createCursorKeys();
     this.keys = this.input.keyboard.addKeys('W,A,S,D,R');
     this.input.keyboard.on('keydown-R', () => this.scene.restart());
@@ -58,7 +58,7 @@ class CoinDash extends Phaser.Scene {
     const direction = new Phaser.Math.Vector2(dx, dy).normalize().scale(COIN_DASH.playerSpeed);
     this.player.body.setVelocity(direction.x, direction.y);
     const seconds = Math.max(0, Math.ceil((this.deadline - this.time.now) / 1000));
-    this.hud.setText(`Coins: ${this.score}                       Time: ${seconds}s`);
+    this.theme.updateHud(this.score, seconds);
     if (seconds === 0) this.finish('Time is up!');
   }
 
@@ -66,12 +66,7 @@ class CoinDash extends Phaser.Scene {
     if (this.finished) return;
     this.finished = true;
     this.physics.pause();
-    const c = COIN_DASH;
-    this.add.rectangle(c.width / 2, c.height / 2, 460, 150, 0x0a1120, 0.95);
-    this.add.text(c.width / 2, c.height / 2,
-      `${reason}\n${this.score} coins collected\nPress R to try again`,
-      { font: '24px monospace', color: '#ffffff', align: 'center', lineSpacing: 12 }
-    ).setOrigin(0.5);
+    this.theme.showGameOver(reason, this.score);
   }
 }
 window.coinDashGame = new Phaser.Game({
