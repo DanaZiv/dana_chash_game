@@ -35,33 +35,39 @@
     ['...BBB....BBB...', '..NNNN....NNNN..']
   ];
 
-  // Mushroom enemy: 20x20 cells at 2px, so it reads clearly at game size. The physics body
-  // from game.js is unchanged (26x26) and sits over the head and face.
+  // Mushroom enemy: a big spotted red cap over a cream stem with an angry face, drawn at 2px per
+  // cell. The physics body from game.js is unchanged (26x26) and sits over the cap and face.
   const SHROOM_PALETTE = {
-    M: 0x9a4a1c, m: 0x6a2f10, L: 0xc8743c, K: 0x150a05, W: 0xffffff, T: 0xf3d2a2, t: 0xc99a62
+    R: 0xe52521, r: 0x9c1414, L: 0xff8a7a, W: 0xffffff, C: 0xfbe6c2, c: 0xd9b98a,
+    K: 0x150a05, P: 0xff9a9a, F: 0x6b3a12
   };
   const SHROOM_BODY = [
-    '.......mmmmmm.......',
-    '.....mMMMMMMMMm.....',
-    '....MLLMMMMMMMMM....',
-    '...MLLMMMMMMMMMMM...',
-    '..MKKMMMMMMMMMMKKM..',
-    '..MMKKKKMMMMKKKKMM..',
-    '.MMMMWWWKMMKWWWMMMM.',
-    '.MMMWWWKKMMKKWWWMMM.',
-    'MMMMWWWKKMMKKWWWMMMM',
-    'MMMMMWWWMMMMWWWMMMMM',
-    'MMMMMMMMMMMMMMMMMMMM',
-    'MMMMMKKKKKKKKKKMMMMM',
-    '.MMMMKWKKKKKKWKMMMM.',
-    '..mmmmmmmmmmmmmmmm..',
-    '.....TTTTTTTTTT.....',
-    '....TTTTTTTTTTTT....',
-    '....TTTTttttTTTT....'
+    '.......RRRRRR.......',
+    '.....RLLRWWRRRR.....',
+    '....RLLRWWWWRRRR....',
+    '...RWWRRWWWWRRRRR...',
+    '..RWWWWRRWWRRRWWRR..',
+    '.RRWWWWRRRRRRWWWWRR.',
+    '.RRRWWRRRRRRRWWWWRR.',
+    'RRRRRRRRWWWRRRWWRRRR',
+    'RWWRRRRWWWWWRRRRRWWR',
+    'RWWWRRRRWWWRRRRRWWWR',
+    'rRRRRRRRRRRRRRRRRRRr',
+    '.rrrrrrrrrrrrrrrrrr.',
+    '...CCCCCCCCCCCCCC...',
+    '...CKKCCCCCCCCKKC...',
+    '...CCKKKCCCCKKKCC...',
+    '...CWWWKCCCCKWWWC...',
+    '...CWWKKCCCCKKWWC...',
+    '...CWWKKCCCCKKWWC...',
+    '...CPCCCCCCCCCCPC...',
+    '...CCCCCKKKKCCCCC...',
+    '...CCCCKCCCCKCCCC...',
+    '....cccccccccccc....'
   ];
   const SHROOM_FEET = [
-    ['..KKKKKTTTTTTKK.....', '.KKKKKKKK..KKKKK....', '.KKKKKKKK..KKKKK....'],
-    ['.....KKTTTTTTKKKKK..', '....KKKKK..KKKKKKKK.', '....KKKKK..KKKKKKKK.']
+    ['...FFFF.....FFF.....', '..FFFFF.....FFFF....'],
+    ['.....FFF.....FFFF...', '....FFFF.....FFFFF..']
   ];
 
   const SPARKLE = ['...W...', '...W...', '..WYW..', 'WWYYYWW', '..WYW..', '...W...', '...W...'];
@@ -109,7 +115,7 @@
     HERO_FEET.forEach((feet, i) =>
       pixelTexture(scene, `hero${i}`, HERO_BODY.concat(feet), HERO_PALETTE, 2));
     SHROOM_FEET.forEach((feet, i) =>
-      pixelTexture(scene, `goomba${i}`, SHROOM_BODY.concat(feet), SHROOM_PALETTE, 2));
+      pixelTexture(scene, `mushroom${i}`, SHROOM_BODY.concat(feet), SHROOM_PALETTE, 2));
     const coinPalette = { y: 0xffd23f, o: 0xd98a00, h: 0xfff6c0 };
     [5, 3.6, 2.1, 0.8].forEach((hw, i) => pixelTexture(scene, `coin${i}`, coinRows(hw), coinPalette, 2));
     pixelTexture(scene, 'sparkle', SPARKLE, { W: 0xffffff, Y: 0xffe066 }, 2);
@@ -139,7 +145,7 @@
   function createAnimations(scene) {
     const anims = [
       ['hero-walk', ['hero0', 'hero1'], 8],
-      ['goomba-walk', ['goomba0', 'goomba1'], 6],
+      ['mushroom-walk', ['mushroom0', 'mushroom1'], 6],
       ['coin-spin', ['coin0', 'coin1', 'coin2', 'coin3', 'coin2', 'coin1'], 10]
     ];
     anims.forEach(([key, frames, frameRate]) => {
@@ -299,7 +305,7 @@
         drone.setVisible(false);
         // Enemies draw above the HUD bar so their edges are never hidden when they bounce off the top.
         const shadow = scene.add.ellipse(drone.x, drone.y, 34, 8, 0x000000, 0.28).setDepth(DEPTH.enemy);
-        const sprite = scene.add.sprite(drone.x, drone.y, 'goomba0').setDepth(DEPTH.enemy).play('goomba-walk');
+        const sprite = scene.add.sprite(drone.x, drone.y, 'mushroom0').setDepth(DEPTH.enemy).play('mushroom-walk');
         sprite.anims.setProgress(i / 3);
         return { drone, sprite, shadow, phase: i * 2.1 };
       });
@@ -332,7 +338,7 @@
         const t = paused ? 0 : this.scene.time.now / 160 + phase;
         sprite.setPosition(drone.x, drone.y - 4 - Math.abs(Math.sin(t)) * 2);
         sprite.setAngle(Math.sin(t) * 5).setScale(1, 1 - Math.abs(Math.cos(t)) * 0.04);
-        shadow.setPosition(drone.x, drone.y + 17);
+        shadow.setPosition(drone.x, drone.y + 22);
         if (drone.body.velocity.x !== 0) sprite.setFlipX(drone.body.velocity.x > 0);
         if (paused && sprite.anims.isPlaying) sprite.anims.pause();
         if (!paused && sprite.anims.isPaused) sprite.anims.resume();
