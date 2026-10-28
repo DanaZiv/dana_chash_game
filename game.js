@@ -7,9 +7,15 @@ class CoinDash extends Phaser.Scene {
     this.score = 0;
     this.finished = false;
     this.paused = false;
+    this.lives = c.lives;
+    this.invincibleUntil = 0;
     this.deadline = this.time.now + c.roundSeconds * 1000;
     this.physics.world.setBounds(0, 44, c.width, c.height - 44);
     this.theme = new CoinDashTheme(this);
+    // Hearts sit in the themed HUD bar between the coin counter and the title (HUD depth is 7).
+    this.hearts = [];
+    for (let i = 0; i < c.lives; i++) this.hearts.push(this.add.graphics({ x: 200 + i * 30, y: 22 }).setDepth(7));
+    this.updateHearts();
     this.player = this.add.rectangle(c.width / 2, c.height / 2, 24, 24, c.colors.player);
     this.physics.add.existing(this.player);
     this.player.body.setCollideWorldBounds(true);
@@ -32,7 +38,7 @@ class CoinDash extends Phaser.Scene {
       this.theme.collectSparkle(this.coin.x, this.coin.y);
       this.placeCoin();
     });
-    this.physics.add.overlap(this.player, this.drones, () => this.finish('A mushroom caught you!'));
+    this.physics.add.overlap(this.player, this.drones, () => this.loseLife());
     this.cursors = this.input.keyboard.createCursorKeys();
     this.keys = this.input.keyboard.addKeys('W,A,S,D,R,P');
     this.input.keyboard.on('keydown-R', () => this.scene.restart());
@@ -58,6 +64,7 @@ class CoinDash extends Phaser.Scene {
     this.paused = true;
     // Freeze the round timer by remembering how much time was left.
     this.remainingMs = this.deadline - this.time.now;
+    this.invincibleRemainingMs = Math.max(0, this.invincibleUntil - this.time.now);
     this.physics.pause();
     this.pauseOverlay.setVisible(true);
   }
@@ -90,6 +97,7 @@ class CoinDash extends Phaser.Scene {
     this.countingDown = false;
     this.paused = false;
     this.deadline = this.time.now + this.remainingMs;
+    this.invincibleUntil = this.time.now + this.invincibleRemainingMs;
     this.physics.resume();
   }
 
@@ -105,8 +113,33 @@ class CoinDash extends Phaser.Scene {
     this.coin.body.reset(x, y);
   }
 
+  // Hearts are drawn from two circles and a triangle, so the game still needs no image assets.
+  updateHearts() {
+    const colors = COIN_DASH.colors;
+    this.hearts.forEach((heart, i) => {
+      heart.clear().fillStyle(i < this.lives ? colors.heart : colors.heartEmpty, 1);
+      heart.fillCircle(-5, -3, 6).fillCircle(5, -3, 6).fillTriangle(-10.5, 0, 10.5, 0, 0, 11);
+    });
+  }
+
+  isInvincible() { return this.time.now < this.invincibleUntil; }
+
+  loseLife() {
+    if (this.finished || this.isInvincible()) return;
+    this.lives = Math.max(0, this.lives - 1);
+    this.updateHearts();
+    if (this.lives === 0) {
+      this.player.setAlpha(1);
+      this.finish('A mushroom caught you!');
+      return;
+    }
+    this.invincibleUntil = this.time.now + COIN_DASH.invincibilityMs;
+  }
+
   update() {
     if (this.finished || this.paused) return;
+    // Blink while invincible; uses scene time so it freezes with the rest of the scene.
+    this.player.setAlpha(this.isInvincible() && Math.floor(this.time.now / 100) % 2 === 0 ? 0.25 : 1);
     const dx = Number(this.cursors.right.isDown || this.keys.D.isDown)
       - Number(this.cursors.left.isDown || this.keys.A.isDown);
     const dy = Number(this.cursors.down.isDown || this.keys.S.isDown)

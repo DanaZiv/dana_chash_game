@@ -330,6 +330,8 @@
       const bob = moving ? -Math.abs(Math.sin(this.scene.time.now / 70)) * 3 : 0;
       this.hero.setPosition(this.player.x, this.player.y - 3 + bob);
       this.hero.setAngle(moving ? Math.sign(body.velocity.x) * 5 : 0);
+      // Mirror the hidden physics shape's alpha so effects like the invincibility blink still show.
+      this.hero.setAlpha(this.player.alpha);
       this.heroShadow.setPosition(this.player.x, this.player.y + 15);
       this.coinSprite.setPosition(this.coin.x, this.coin.y);
       this.coinGlow.setPosition(this.coin.x, this.coin.y);
