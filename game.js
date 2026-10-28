@@ -1,6 +1,9 @@
-/* global Phaser, COIN_DASH, COIN_DASH_LEVELS, COIN_DASH_POWERUPS, CoinDashTutorial */
+/* global Phaser, COIN_DASH, COIN_DASH_LEVELS, COIN_DASH_POWERUPS, CoinDashTutorial, CoinDashTheme, CoinDashSounds */
 // Several coins are always on the field; a collected coin reappears elsewhere at once.
 const COIN_RULES = { count: 6, doubleChance: 0.25, doubleColor: 0xff922b, minGap: 45 };
+// The themed HUD bar covers y 0-44; a second strip below it (y 44-70) holds the level,
+// power-up timers, best score and sound label, so the play area starts at y 70.
+const STRIP = { centerY: 57, playTop: 70, depth: 7.5 };
 
 class CoinDash extends Phaser.Scene {
   constructor() { super('CoinDash'); }
@@ -13,15 +16,19 @@ class CoinDash extends Phaser.Scene {
     this.level = 1;
     this.finished = false;
     this.banner = null;
+    this.paused = false;
+    this.lives = c.lives;
+    this.invincibleUntil = 0;
     this.deadline = this.time.now + c.roundSeconds * 1000;
-    this.physics.world.setBounds(0, 44, c.width, c.height - 44);
-    this.add.grid(c.width / 2, c.height / 2, c.width, c.height, 40, 40,
-      c.colors.background, 1, 0x24334b, 0.45);
-    const hudFont = { font: '18px monospace', color: '#ffffff' };
-    this.hud = this.add.text(18, 12, '', hudFont);
-    this.levelText = this.add.text(170, 12, '', { ...hudFont, color: '#71e8ce', fontStyle: 'bold' });
-    // Time and Best share the top-right corner, stacked: Time on top, Best below (see attach()).
-    this.timeText = this.add.text(c.width - 18, 4, '', hudFont).setOrigin(1, 0);
+    this.physics.world.setBounds(0, STRIP.playTop, c.width, c.height - STRIP.playTop);
+    this.theme = new CoinDashTheme(this);
+    // Hearts sit in the themed HUD bar between the coin counter and the title (HUD depth is 7).
+    this.hearts = [];
+    for (let i = 0; i < c.lives; i++) this.hearts.push(this.add.graphics({ x: 200 + i * 30, y: 22 }).setDepth(7));
+    this.updateHearts();
+    this.levelText = this.add.text(14, STRIP.centerY, '', {
+      font: 'bold 16px monospace', color: '#71e8ce', stroke: '#1b1010', strokeThickness: 3
+    }).setOrigin(0, 0.5).setDepth(STRIP.depth);
     this.player = this.add.rectangle(c.width / 2, c.height / 2, 24, 24, c.colors.player);
     this.physics.add.existing(this.player);
     this.player.body.setCollideWorldBounds(true);
@@ -39,16 +46,84 @@ class CoinDash extends Phaser.Scene {
     for (let i = 0; i < c.droneCount; i++) {
       COIN_DASH_LEVELS.createEnemy(this, 'drone', 90 + i * 270, 100, 35 + i * 105);
     }
+    this.theme.dressUp(this.player, this.coinGroup.getChildren(), this.drones);
     // Fresh manager per round, so restarting clears every active effect.
-    this.powerUps = new COIN_DASH_POWERUPS.Manager(this, 372, 22, 80);
+    this.powerUps = new COIN_DASH_POWERUPS.Manager(this, 220, STRIP.centerY, 80, STRIP.depth);
     this.physics.add.overlap(this.player, this.coinGroup, (player, coin) => this.collectCoin(coin));
     this.physics.add.overlap(this.player, this.drones, (player, drone) => {
-      if (COIN_DASH_LEVELS.isHarmful(drone, this.time.now)) this.finish('A drone caught you!');
+      if (COIN_DASH_LEVELS.isHarmful(drone, this.time.now)) this.loseLife();
     });
+    // Sound label at the right end of the strip, Best just left of it.
+    CoinDashSounds.attach(this, { x: c.width - 12, y: STRIP.centerY - 9, size: 14 });
+    window.CoinDashHighScore.attach(this, { x: c.width - 160, y: STRIP.centerY - 9, font: 'bold 14px monospace' });
     this.cursors = this.input.keyboard.createCursorKeys();
-    this.keys = this.input.keyboard.addKeys('W,A,S,D,R');
+    this.keys = this.input.keyboard.addKeys('W,A,S,D,R,P');
     this.input.keyboard.on('keydown-R', () => this.scene.restart());
-    window.CoinDashHighScore.attach(this, { y: 25, font: '14px monospace' });
+    this.input.keyboard.on('keydown-P', () => this.togglePause());
+    this.pauseOverlay = this.add.container(c.width / 2, c.height / 2, [
+      this.add.rectangle(0, 0, 320, 110, 0x0a1120, 0.9),
+      this.add.text(0, -12, 'PAUSED', { font: '36px monospace', color: '#ffd166' }).setOrigin(0.5),
+      this.add.text(0, 28, 'Press P to resume', { font: '16px monospace', color: '#ffffff' }).setOrigin(0.5)
+    ]).setDepth(10).setVisible(false);
+    this.countingDown = false;
+    this.countdownText = this.add.text(c.width / 2, c.height / 2, '',
+      { font: 'bold 96px monospace', color: '#ffd166', stroke: '#0a1120', strokeThickness: 8 }
+    ).setOrigin(0.5).setDepth(10).setVisible(false);
+  }
+
+  togglePause() {
+    // Ignore P after the round ends or while a resume countdown is running.
+    if (this.finished || this.countingDown) return;
+    if (this.paused) {
+      this.startResumeCountdown();
+      return;
+    }
+    this.paused = true;
+    this.pausedAt = this.time.now;
+    // Freeze the round timer by remembering how much time was left.
+    this.remainingMs = this.deadline - this.time.now;
+    this.invincibleRemainingMs = Math.max(0, this.invincibleUntil - this.time.now);
+    this.physics.pause();
+    this.pauseOverlay.setVisible(true);
+  }
+
+  startResumeCountdown() {
+    // The scene clock keeps ticking while physics is paused, so it drives the countdown.
+    this.countingDown = true;
+    this.pauseOverlay.setVisible(false);
+    let count = 3;
+    this.countdownText.setText(String(count)).setVisible(true);
+    this.countdownTimer = this.time.addEvent({
+      delay: 1000,
+      repeat: 2,
+      callback: () => {
+        count--;
+        if (count > 0) {
+          this.countdownText.setText(String(count));
+          return;
+        }
+        this.countdownText.setText('GO!');
+        this.resumeGame();
+        this.time.delayedCall(600, () => {
+          if (this.countdownText.text === 'GO!') this.countdownText.setVisible(false);
+        });
+      }
+    });
+  }
+
+  resumeGame() {
+    this.countingDown = false;
+    this.paused = false;
+    this.deadline = this.time.now + this.remainingMs;
+    this.invincibleUntil = this.time.now + this.invincibleRemainingMs;
+    // Power-up effects, pickup spawns and new-enemy grace periods also run on scene time,
+    // so push them back by the length of the pause.
+    const pausedMs = this.time.now - this.pausedAt;
+    this.powerUps.shiftTimers(pausedMs);
+    this.drones.getChildren().forEach(enemy => {
+      if (enemy.harmlessUntil > this.pausedAt) enemy.harmlessUntil += pausedMs;
+    });
+    this.physics.resume();
   }
 
   getScore() { return this.score; }
@@ -60,10 +135,13 @@ class CoinDash extends Phaser.Scene {
 
   collectCoin(coin) {
     if (this.finished) return;
+    const points = this.pointsForCoin(coin);
     this.coins++;
     this.levelCoins++;
-    this.score += this.pointsForCoin(coin);
+    this.score += points;
     this.events.emit('score-changed', this.score);
+    this.theme.collectSparkle(coin.x, coin.y, points);
+    CoinDashSounds.coin();
     this.placeCoin(coin);
     if (this.levelCoins >= COIN_DASH_LEVELS.coinsForLevel(this.level)) {
       this.levelCoins = 0;
@@ -75,7 +153,7 @@ class CoinDash extends Phaser.Scene {
     this.level = level;
     const wanted = COIN_DASH_LEVELS.enemyKindsForLevel(level);
     const added = wanted.slice(this.drones.getLength());
-    added.forEach(kind => COIN_DASH_LEVELS.spawnEnemy(this, kind));
+    added.forEach(kind => this.theme.dressEnemy(COIN_DASH_LEVELS.spawnEnemy(this, kind)));
     const { kinds, speedFactorForLevel } = COIN_DASH_LEVELS;
     const faster = speedFactorForLevel(level) > speedFactorForLevel(level - 1);
     this.showBanner(`LEVEL ${level}`, added.length
@@ -89,7 +167,7 @@ class CoinDash extends Phaser.Scene {
     const banner = this.banner = this.add.text(c.width / 2, c.height / 2 - 60, `${title}\n${subtitle}`, {
       font: 'bold 26px monospace', color: '#71e8ce', align: 'center',
       stroke: '#0a1120', strokeThickness: 6
-    }).setOrigin(0.5);
+    }).setOrigin(0.5).setDepth(8.5);
     this.tweens.add({ targets: banner, alpha: 0, delay: 900, duration: 600,
       onComplete: () => { banner.destroy(); if (this.banner === banner) this.banner = null; } });
   }
@@ -101,7 +179,7 @@ class CoinDash extends Phaser.Scene {
     let x, y, tries = 0;
     do {
       x = Phaser.Math.Between(25, c.width - 25);
-      y = Phaser.Math.Between(70, c.height - 25);
+      y = Phaser.Math.Between(STRIP.playTop + 20, c.height - 25);
     } while (++tries < 50 &&
       (Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y) < 60 ||
        others.some(o => Phaser.Math.Distance.Between(x, y, o.x, o.y) < COIN_RULES.minGap)));
@@ -114,8 +192,34 @@ class CoinDash extends Phaser.Scene {
     coin.label.setPosition(x, y).setVisible(coin.isDouble);
   }
 
+  // Hearts are drawn from two circles and a triangle, so the game still needs no image assets.
+  updateHearts() {
+    const colors = COIN_DASH.colors;
+    this.hearts.forEach((heart, i) => {
+      heart.clear().fillStyle(i < this.lives ? colors.heart : colors.heartEmpty, 1);
+      heart.fillCircle(-5, -3, 6).fillCircle(5, -3, 6).fillTriangle(-10.5, 0, 10.5, 0, 0, 11);
+    });
+  }
+
+  isInvincible() { return this.time.now < this.invincibleUntil; }
+
+  loseLife() {
+    if (this.finished || this.isInvincible()) return;
+    this.lives = Math.max(0, this.lives - 1);
+    this.updateHearts();
+    CoinDashSounds.hit();
+    if (this.lives === 0) {
+      this.player.setAlpha(1);
+      this.finish('A mushroom caught you!');
+      return;
+    }
+    this.invincibleUntil = this.time.now + COIN_DASH.invincibilityMs;
+  }
+
   update() {
-    if (this.finished) return;
+    if (this.finished || this.paused) return;
+    // Blink while invincible; uses scene time so it freezes with the rest of the scene.
+    this.player.setAlpha(this.isInvincible() && Math.floor(this.time.now / 100) % 2 === 0 ? 0.25 : 1);
     const dx = Number(this.cursors.right.isDown || this.keys.D.isDown)
       - Number(this.cursors.left.isDown || this.keys.A.isDown);
     const dy = Number(this.cursors.down.isDown || this.keys.S.isDown)
@@ -129,10 +233,9 @@ class CoinDash extends Phaser.Scene {
       level: this.level, slow: powerUps.isActive('slow'), shrink: powerUps.isActive('shrink')
     });
     const seconds = Math.max(0, Math.ceil((this.deadline - this.time.now) / 1000));
-    this.hud.setText(`Score: ${this.score}`);
+    this.theme.updateHud(this.score, seconds);
     this.levelText.setText(
       `Level ${this.level} · ${this.levelCoins}/${COIN_DASH_LEVELS.coinsForLevel(this.level)}`);
-    this.timeText.setText(`Time: ${seconds}s`);
     if (seconds === 0) this.finish('Time is up!');
   }
 
@@ -140,12 +243,12 @@ class CoinDash extends Phaser.Scene {
     if (this.finished) return;
     this.finished = true;
     this.physics.pause();
-    const c = COIN_DASH;
-    this.add.rectangle(c.width / 2, c.height / 2, 520, 170, 0x0a1120, 0.95);
-    this.add.text(c.width / 2, c.height / 2,
-      `${reason}\nScore: ${this.score} (${this.coins} coins) · Level ${this.level}\nPress R to try again`,
-      { font: '22px monospace', color: '#ffffff', align: 'center', lineSpacing: 12 }
-    ).setOrigin(0.5);
+    // A late "GO!" from the resume countdown must not cover the game-over panel.
+    this.pauseOverlay.setVisible(false);
+    this.countdownText.setVisible(false);
+    CoinDashSounds.gameOver();
+    this.theme.showGameOver(reason, this.score,
+      `POINTS · ${this.coins} ${this.coins === 1 ? 'COIN' : 'COINS'} · LEVEL ${this.level}`);
     this.events.emit('round-over', { score: this.score, coins: this.coins, level: this.level });
   }
 }

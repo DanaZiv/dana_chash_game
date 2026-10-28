@@ -31,7 +31,7 @@ class CoinDashTutorial extends Phaser.Scene {
     Object.keys(kinds).forEach((kind, i) => {
       this.add.rectangle(left + 9 + i * 26, 174, 18, 18, kinds[kind].color);
     });
-    this.add.text(left + 110, 164, 'Avoid enemies - one touch ends the round.', body);
+    this.add.text(left + 110, 164, `Avoid enemies - each touch costs 1 of ${COIN_DASH.lives} hearts.`, body);
     this.add.text(left + 110, 186, 'New kinds appear as levels go up.', { ...body, color: '#9fb0c8' });
 
     this.add.text(left, 222, 'Collect power-ups. Each one lasts 5 SECONDS:', body);
@@ -44,7 +44,7 @@ class CoinDashTutorial extends Phaser.Scene {
     });
 
     this.add.text(cx, 352,
-      `You have ${c.roundSeconds} seconds. Press R during a round to restart.`,
+      `You have ${c.roundSeconds} seconds. P pauses, M mutes, R restarts.`,
       { ...body, color: '#9fb0c8' }).setOrigin(0.5);
 
     const button = this.add.rectangle(cx, 420, 260, 54, 0x71e8ce)

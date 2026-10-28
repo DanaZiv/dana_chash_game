@@ -73,19 +73,28 @@ window.COIN_DASH_POWERUPS = (() => {
   }
 
   class Manager {
-    constructor(scene, hudX, hudY, hudGap = 86) {
+    // `depth` lifts the HUD, pickups and labels above a themed background or HUD bar.
+    constructor(scene, hudX, hudY, hudGap = 86, depth = 0) {
       this.scene = scene;
+      this.depth = depth;
       this.expiresAt = {};   // type -> scene time when the effect ends
       this.pickup = null;
       this.lastType = null;
       this.nextSpawnAt = scene.time.now + Phaser.Math.Between(...rules.firstSpawnMs);
       this.hud = order.map((type, i) => {
-        const icon = makeIcon(scene, type, hudX + i * hudGap, hudY, 0.65);
+        const icon = makeIcon(scene, type, hudX + i * hudGap, hudY, 0.65).setDepth(depth);
         const text = scene.add.text(hudX + i * hudGap + 13, hudY, '', {
           font: '16px monospace', color: '#ffffff'
-        }).setOrigin(0, 0.5);
+        }).setOrigin(0, 0.5).setDepth(depth);
         return { type, icon, text };
       });
+    }
+
+    // Pushes every running timer back by `ms`, e.g. after the game was paused.
+    shiftTimers(ms) {
+      Object.keys(this.expiresAt).forEach(type => { this.expiresAt[type] += ms; });
+      this.nextSpawnAt += ms;
+      if (this.pickup) this.pickup.despawnAt += ms;
     }
 
     isActive(type) {
@@ -139,7 +148,7 @@ window.COIN_DASH_POWERUPS = (() => {
         y = Phaser.Math.Between(90, c.height - 40);
       } while (++tries < 40 &&
         Phaser.Math.Distance.Between(x, y, player.x, player.y) < rules.minSpawnDistance);
-      this.pickup = makeIcon(this.scene, type, x, y);
+      this.pickup = makeIcon(this.scene, type, x, y).setDepth(this.depth);
       this.pickup.powerType = type;
       this.pickup.despawnAt = now + rules.lifetimeMs;
       this.lastType = type;
@@ -156,7 +165,7 @@ window.COIN_DASH_POWERUPS = (() => {
     floatLabel(message, x, y) {
       const label = this.scene.add.text(x, y - 20, message, {
         font: 'bold 16px monospace', color: '#ffffff', stroke: '#0a1120', strokeThickness: 4
-      }).setOrigin(0.5);
+      }).setOrigin(0.5).setDepth(this.depth);
       this.scene.tweens.add({
         targets: label, y: y - 55, alpha: 0, duration: 900, onComplete: () => label.destroy()
       });
