@@ -159,6 +159,9 @@ class CoinDash extends Phaser.Scene {
     if (this.finished) return;
     this.finished = true;
     this.physics.pause();
+    // A late "GO!" from the resume countdown must not cover the game-over panel.
+    this.pauseOverlay.setVisible(false);
+    this.countdownText.setVisible(false);
     CoinDashSounds.gameOver();
     this.theme.showGameOver(reason, this.score);
   }
